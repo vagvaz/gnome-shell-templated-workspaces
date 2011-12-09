@@ -1,0 +1,10 @@
+This is a gnome-shell extension for saving the current running application as a template workspace and then run it afterwards.
+
+The extension does not work yet as advertised.
+It is based on Workspace Indicator by gcampax.
+
+When it will be usable we are going to upload it to the https://extensions.gnome.org/
+
+Feel free to comment, file bugs etc.
+
+created by kounabi,vagvaz
