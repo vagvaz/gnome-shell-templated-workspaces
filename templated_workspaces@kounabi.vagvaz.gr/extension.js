@@ -27,20 +27,94 @@ function NewWorkspace() {
 	this._init.apply(this, arguments);
 }
 
-function TWorkspace(){
-	this._init.apply(this,arguments);
+function TWorkspace(name,enabled,active){
+	this._init(name,enabled,active);
+	//this._setup(name,enabled,active);
 }
 
 TWorkspace.prototype ={
-		__proto__: PopupMenu.PopupBaseMenuItem.prototype,
+		__proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 		
-		_init: function(itemParams){
+		_init: function(name,enabled,active){
+			PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this,name);
 			global.log('Templated Workspace created');
-			this._wname = '';
-			this._enabled = false;
-			this._active = false;
-			
-		}
+			this._wname = name;
+			this._enabled = enabled;
+			this._active = active;
+			this.apps =  new Array();
+			//let containerbox = new St.BoxLayout({style_class: 'hamster-box'});
+			//let label = new St.Label({style_class:'helloworld-label'});
+			global.log('a');
+			//label.set_text(this._wname);
+			//containerbox.add(label);
+			global.log('b');
+			 this._activeToggle = new PopupMenu.PopupSwitchMenuItem(_("active"),this._active);
+			 this._enableToggle = new PopupMenu.PopupSwitchMenuItem(_("enabled"),this._enabled);
+			 global.log('c');
+			 //containerbox.add(this._enableToggle);
+			 //containerbox.add(this._activeToggle);
+			 this.menu.addMenuItem(this._activeToggle);
+			 this.menu.addMenuItem(this._enableToggle);
+			 global.log('d');
+			 this._enableToggle.connect("toggled",Lang.bind(this,this._toggleEnable));
+			 this._activeToggle.connect("toggled",Lang.bind(this,this._toggleActive));
+			 global.log('1');
+			 //this.addActor(containerbox);
+			 global.log('f');
+		},
+		_toggleEnable:function(item)
+		{
+			if(item != null)
+			{
+				this._enabled = item.state;
+			}
+			if(this._enabled == false)
+			{
+				this.emit('disable');
+				global.log('disable');
+			}
+			else{
+				this.emit('enable');
+				global.log('enable');
+			}
+		},
+		
+		_toggleActive:function(item)
+		{
+			if(item != null)
+			{
+				this._active = item.state;
+			}
+			if(this._active == false)
+			{
+				this.emit('deactivate');
+				global.log('deactivate');
+			}
+			else{
+				this.emit('activate');
+				global.log('activate');
+			}
+		},
+		
+		
+		_addApplication:function(app){
+			global.log("adding application");
+			global.log(app);
+			if(this[app] == undefined)
+			{
+				this[app] = true
+				this.apps[this.apps.length] = app;
+			}
+			else
+			{
+				global.log("Application is already added");
+				global.log(app);
+			}
+	  },
+	  
+	  _getApplications: function(){
+		  return this.apps;
+	  }
 };
 
 
@@ -170,19 +244,28 @@ WorkspaceIndicator.prototype = {
 	
 	_newWorkspace: function() {
 					let txt = this._newEntry.text.get_text();
-					let item = new PopupMenu.PopupMenuItem(txt);
+					let item = new TWorkspace(txt,false,false);
 					let applications = [];
 					let windowslist = global.screen.get_active_workspace().list_windows();
 					let i=0;
 					let j=0;
 					global.log("mphka reeee");
+					
 					for(; i<windowslist.length; i++){
 						//if (windowslist[i].get_meta_window().is_on_all_workspaces())
               //  continue;
 						j++;
 					
 						applications[j] = windowslist[i].get_wm_class().toLowerCase()+".desktop";
-						global.log(applications[j]);
+						//global.log(applications[j]);
+						item._addApplication(applications[j]);
+						global.log("after addding one app apps are ");
+						oops = item._getApplications();
+						for(let p = 0; p < oops.length;p++)
+						{
+							global.log(oops[p]);
+						}
+						global.log("end of apps");
 						//this._customWorkspaces.addMenuItem(item);
 					}
 					
