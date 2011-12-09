@@ -1,0 +1,16 @@
+
+.helloworld-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #ffffff;
+    background-color: rgba(10,10,10,0.4);
+
+    border-radius: 5px;
+    padding: .5em;
+    text-align: center
+}
+
+.hamster-box{
+
+
+}
