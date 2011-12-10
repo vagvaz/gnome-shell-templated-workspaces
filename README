@@ -2,9 +2,11 @@ This is a gnome-shell extension for saving the current running application as a 
 
 The extension does not work yet as advertised.
 It is based on Workspace Indicator by gcampax.
+We also used as a reference the pomodoro shell-extension and the hamster box!
 
 When it will be usable we are going to upload it to the https://extensions.gnome.org/
 
 Feel free to comment, file bugs etc.
 
 created by kounabi,vagvaz
+
