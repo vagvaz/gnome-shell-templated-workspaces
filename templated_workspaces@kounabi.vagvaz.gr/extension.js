@@ -26,7 +26,7 @@ let _newEntry;
 function NewWorkspace() {
 	this._init.apply(this, arguments);
 }
-
+//TWorkspace constructor
 function TWorkspace(name,indx,control,active,enabled){
 	this._init(name,indx,control,active,enabled);
 	//this._setup(name,enabled,active);
@@ -43,16 +43,18 @@ TWorkspace.prototype ={
 			this._control = control;
 			this.apps = [];
 			this.assoc_apps = new Array();
+			//If we do not control the workspace (customWorkspace)
 			if(!this._control)
 			{
 				this._enabled = false;
 				this._active = false;
 				return;
 			}
-			
+			//create the submenu entry
 			this._createSubMenuEntry(enabled,active);
 		},
 		_createSubMenuEntry:function (enabled,active){
+		
 			this._enabled = enabled;
 			this._active = active;
 			
@@ -64,15 +66,18 @@ TWorkspace.prototype ={
 			
 			 this.menu.addMenuItem(this._activeToggle);
 			 this.menu.addMenuItem(this._enableToggle);
-			
-			 let entry = new PopupMenu.PopupMenuItem(_('Remove'));
-			 this.menu.addMenuItem(entry);
-			 entry.connect("activate",Lang.bind(this,this._remove));
+			 //Menu entry for Removing TWorkspace
+			 let removeEntry = new PopupMenu.PopupMenuItem(_('Remove'),{style_class: 'RemoveButton'});
+			 this.menu.addMenuItem(removeEntry);
+			 
+			 //connect remove entry signal with this_remove
+			 removeEntry.connect("activate",Lang.bind(this,this._remove));
 			 this._enableToggle.connect("toggled",Lang.bind(this,this._toggleEnable));
 			 this._activeToggle.connect("toggled",Lang.bind(this,this._toggleActive));
 		},
 		
-		
+		//set control either we control it or not
+		//Not needed at this time
 		set_control:function(docontrol)
 		{
 			if(this._control)
@@ -107,16 +112,21 @@ TWorkspace.prototype ={
 		
 		_toggleEnable:function(item)
 		{
+			//handler when toggling enable switch
 			if(item != null)
 			{
 				this._enabled = item.state;
 			}
 			if(this._enabled == false)
 			{
+				//emit disable signal 
+				//when this signal is emitted we must save the configuration with the disabled TWorkspace
 				this.emit('disable');
 				global.log('disable');
 			}
 			else{
+				//emit enable signal
+				//when enable is emitted if save the configuration with this workspace enabled;
 				this.emit('enable');
 				global.log('enable');
 			}
@@ -130,10 +140,12 @@ TWorkspace.prototype ={
 			}
 			if(this._active == false)
 			{
+				//Close workspace and all its windows
 				this.emit('deactivate');
 				global.log('deactivate');
 			}
 			else{
+				//activate worspace (create it and then execute all the apps)
 				this.emit('activate');
 				global.log('activate');
 			}
@@ -141,12 +153,15 @@ TWorkspace.prototype ={
 		
 		_remove:function()
 		{
-			//this.emit('deactivate');
+			//remove emits this signal the indicator should remove  TWorkspace is passed as an argument
+			//and save configuration without this workspace
 			this.emit('remove-sub-menu-entry',this);
 		},
 		
+		//add an application
+		//we use an assicative array in order to quickly check whether an app is alread in the workspace
+		//instead of iterating over the apps array
 		_addApplication:function(app){
-			global.log("adding application");
 			global.log(app);
 			if(this.assoc_apps[app] == undefined)
 			{
@@ -155,7 +170,6 @@ TWorkspace.prototype ={
 			}
 			else
 			{
-				global.log("Application is already added");
 				global.log(app);
 			}
 	  },
@@ -172,9 +186,10 @@ NewWorkspace.prototype = {
 				_init: function(itemParams) {
 							PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {reactive: false});
 
+							//create the box layout
 							let box = new St.BoxLayout({style_class: 'hamster-box'});
 							box.set_vertical(true);
-							
+							//create the Save Current workspace label
 							let label = new St.Label({ style_class: 'helloworld-label'});
 							label.set_text("Save Current Workspace");
 							box.add(label);
@@ -187,7 +202,8 @@ NewWorkspace.prototype = {
 
 							this.text.clutter_text.connect('activate', Lang.bind(this, this._onEntryActivated));
 							box.add(this.text);
-								
+							
+							//add the box to our entry
 							this.addActor(box);
 							
 							
@@ -206,8 +222,9 @@ WorkspaceIndicator.prototype = {
 	_init: function(){
 		PanelMenu.SystemStatusButton.prototype._init.call(this, 'folder');
 		//initialize our array of workspaces;
-		
+		//the array which keeps all the Template Workspaces for our indicator
 		this.tworkspaces = [];
+		//the assoc array which handles wheether a certain name is used
 		this.tworkspaces_assoc = {};
 	   this._currentWorkspace = global.screen.get_active_workspace().index();
 		this.statusLabel = new St.Label({ text: this._labelText() });
@@ -217,19 +234,23 @@ WorkspaceIndicator.prototype = {
 		this._newEntry = item;
 		this.menu.addMenuItem(item);
 	  
-	  // destroy all previously created children, and add our statusLabel
- 	  this.actor.get_children().forEach(function(c) { c.destroy() });
+	   // destroy all previously created children, and add our statusLabel
+	   //clear the old ui of indicator
+ 	   this.actor.get_children().forEach(function(c) { c.destroy() });
 		this.actor.add_actor(this.statusLabel);
 
 		this.workspacesItems = [];
 		
 		this._workspaceSection = new PopupMenu.PopupMenuSection();
+		//create our custom Template Workspaces PopupMenu Section
 		this._customWorkspaces = new PopupMenu.PopupMenuSection();
 		
 		this.menu.addMenuItem(this._customWorkspaces);
 		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 		this.menu.addMenuItem(this._workspaceSection);
 		
+		//Connect the signals when a workspace workspace is added, removed or switched
+		//We must change what we do when a workspace is added or removed
 		global.screen.connect_after('workspace-added', Lang.bind(this,this._createWorkspacesSection));
 		global.screen.connect_after('workspace-removed', Lang.bind(this,this._createWorkspacesSection));
 		global.screen.connect_after('workspace-switched', Lang.bind(this,this._updateIndicator));
@@ -240,31 +261,12 @@ WorkspaceIndicator.prototype = {
 	
 	},
 
-	//~ _createCustomWorkspacesSection: function()
-	//~ {
-		//~ 
-		//~ for(let indx = 0; indx < this.tworkspaces; indx++)
-		//~ {
-			//~ if(this.tworkspaces[indx]._control)
-			//~ {
-				//~ 
-			//~ }
-		//~ }
-	//~ },
+	
+	//update indicator label
 	_updateIndicator: function() {
 	    this.workspacesItems[this._currentWorkspace].setShowDot(false);
 	    this._currentWorkspace = global.screen.get_active_workspace().index();
 	    this.workspacesItems[this._currentWorkspace].setShowDot(true);
-		//if(this.workspacesItems[this._currentWorkspace].control)
-		//{
-		//	global.log('!!!!!do not control');
-		//	this.statusLabel.set_text(this.workspacesItems[this._currentWorkspace].actor.get_children()[0].text)
-		//}
-		//else
-		//{
-		//	global.log('do not control');
-		//	this.statusLabel.set_text(this._labelText());
-		//}
 		this.statusLabel.set_text(this.workspacesItems[this._currentWorkspace].twork._wname);
 	},
 
@@ -274,7 +276,7 @@ WorkspaceIndicator.prototype = {
 	    }
 	    return Meta.prefs_get_workspace_name(workspaceIndex);
 	},
-
+//creates the submenu WorkspaceSection
 	_createWorkspacesSection : function() {
 		this._workspaceSection.removeAll();
 		this.workspacesItems = [];
@@ -296,6 +298,7 @@ WorkspaceIndicator.prototype = {
 	    this._updateIndicator();
 	},
 
+	//activate the workspace on index
 	_activate : function (index) {
 
 		if(index >= 0 && index <  global.screen.n_workspaces) {
@@ -304,6 +307,7 @@ WorkspaceIndicator.prototype = {
 		}		
 	},
 
+	//catch scroll event and change Workspace in the same direction
 	_onScrollEvent : function(actor, event) {
 		let direction = event.get_scroll_direction();
 		let diff = 0;
@@ -319,25 +323,29 @@ WorkspaceIndicator.prototype = {
 		this._activate(newIndex);
 	},
 	
+	//Replace a workspace
 	_replaceWorkspace:function(workspace){
 		this.workspacesItems[workspace._indx].actor.get_children()[0].set_text(workspace._wname);
-		this.workspacesItems[workspace._indx].control = true;
-		this.statusLabel.set_text(workspace._wname);
+		this._updateIndicator();
 	},
 	
+	//add a new Template Workspace
 	_addTWorkspace: function(newTWorkspace)
 	{
 		if(this.tworkspaces_assoc[newTWorkspace._wname] == undefined)
-		{
+		{ // if the association array does not have somthine then it is a new TWorkspace so we must add it
+			//add it to the workspaces array
 			this.tworkspaces[this.tworkspaces.length] = newTWorkspace;
+			//association name -> index in the array
 			this.tworkspaces_assoc[newTWorkspace._wname] = this.tworkspaces.length-1;
 			if(newTWorkspace._control)
 				this._customWorkspaces.addMenuItem(newTWorkspace);
 		}
 	},
-	
+	//remove a TEmplate workspace
 	_removeTWorkspace: function(oldWorkspace)
 	{
+		//remove a Template Workspace
 		if(this.tworkspaces_assoc[oldWorkspace._wname] != undefined)
 		{
 		//get index of workspace
@@ -348,11 +356,13 @@ WorkspaceIndicator.prototype = {
 			this.tworkspaces.splice(indx,1);
 		//remove from menu
 		
+			//If we control the tworkspace we must update the customWorkspaces menu section
 			if(oldWorkspace._control)
 			{
 				this._customWorkspaces.removeAll();
 				for(let i = 0; i < this.tworkspaces.length;i++)
 				{
+					//add all the Template Workspaces we control
 					if(this.tworkspaces[i]._control)
 						this._customWorkspaces.addMenuItem(this.tworkspaces[i]);
 				}
@@ -360,6 +370,7 @@ WorkspaceIndicator.prototype = {
 		}
 	},
 	
+	//the action when we want to save a new workspace
 	_newWorkspace: function() {
 					let txt = this._newEntry.text.get_text();
 					let indx = global.screen.get_active_workspace().index() ;
@@ -372,42 +383,47 @@ WorkspaceIndicator.prototype = {
 					let windowslist = global.screen.get_active_workspace().list_windows();
 					let i=0;
 					let j=0;
-					global.log("mphka reeee");
+					//global.log("mphka reeee");
 					
 					for(; i<windowslist.length; i++){
-						//if (windowslist[i].get_meta_window().is_on_all_workspaces())
-              //  continue;
+						//ignore windows when they are on all workspaces
+						if (windowslist[i].is_on_all_workspaces())
+							continue;
 						j++;
 					
 						applications[j] = windowslist[i].get_wm_class().toLowerCase()+".desktop";
 						//global.log(applications[j]);
+						//add application to workspace
 						this.workspacesItems[indx].twork._addApplication(applications[j]);
 						global.log("after addding one app apps are ");
-						let oops = this.workspacesItems[indx].twork._getApplications();
-						for(let p = 0; p < oops.length;p++)
-						{
-							global.log(oops[p]);
-						}
-						global.log("end of apps");
-						//this._customWorkspaces.addMenuItem(item);
 					}
+					
+					global.log('-------------- start of apps -----------');
+					let oops = this.workspacesItems[indx].twork._getApplications();
+					for(let p = 0; p < oops.length;p++)
+					{
+						global.log(oops[p]);
+					}
+					global.log("---------------- end of apps ------------");
 
 					this._replaceWorkspace(this.workspacesItems[indx].twork);
 					//addTWorkspace(this.workspacesItems[indx].twork);
 					this._saveConfig();
 	},
 	 _parseConfig: function() {
-        // Set the default values
+        
 	// Search for configuration files first in system config dirs and after in the user dir
 	let _configDirs = [GLib.get_system_config_dirs(), GLib.get_user_config_dir()];
 		for(var i = 0; i < _configDirs.length; i++)
 		{
+			//our config file
             let _configFile = _configDirs[i] + "/gnome-shell-templated-workspaces/gnome_shell_tworkspaces.json";
-
+					
             if (GLib.file_test(_configFile, GLib.FileTest.EXISTS)) {
 				let filedata = null;
 
 				try {
+					//load Templated Worksapces from configuration
 							 filedata = GLib.file_get_contents(_configFile, null, 0);
 							 global.log("Template Workspaces: Using config file = " + _configFile);
 
@@ -455,17 +471,8 @@ WorkspaceIndicator.prototype = {
                 }
 
         try {
-            //~ jsondata["version"] = this._configVersion;
-            //~ for (let i = 0; i < _configOptions.length; i++) {
-                //~ let option = _configOptions[i];
-                //~ // Insert the option "category", if it's undefined
-                //~ if (jsondata.hasOwnProperty(option[1]) == false) {
-                    //~ jsondata[option[1]] = {};
-                //~ }
-//~ 
-                //~ // Update the option key/value pairs
-                //~ jsondata[option[1]][option[2]] = this[option[0]];
-                let counter = 0;
+					 //save data from configuration 
+                let counter = 0; //counter to save it at the end of the procedure
                 for(let i = 0; i < this.tworkspaces.length;i++)
                 {
 						 
