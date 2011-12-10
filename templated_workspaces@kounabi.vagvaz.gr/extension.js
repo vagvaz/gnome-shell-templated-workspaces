@@ -374,6 +374,8 @@ WorkspaceIndicator.prototype = {
 	_newWorkspace: function() {
 					let txt = this._newEntry.text.get_text();
 					let indx = global.screen.get_active_workspace().index() ;
+					if(this.workspacesItems[indx].twork._control)
+						return;
 					this._removeTWorkspace(this.workspacesItems[indx].twork);
 					this.workspacesItems[indx].twork.destroy();
 					this.workspacesItems[indx].twork = new TWorkspace(txt,indx,true,true,false);
