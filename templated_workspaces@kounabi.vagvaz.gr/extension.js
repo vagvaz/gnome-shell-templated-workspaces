@@ -27,17 +27,18 @@ function NewWorkspace() {
 	this._init.apply(this, arguments);
 }
 
-function TWorkspace(name,enabled,active){
-	this._init(name,enabled,active);
+function TWorkspace(name,indx,enabled,active){
+	this._init(name,indx,enabled,active);
 	//this._setup(name,enabled,active);
 }
 
 TWorkspace.prototype ={
 		__proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 		
-		_init: function(name,enabled,active){
+		_init: function(name,indx,enabled,active){
 			PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this,name);
 			global.log('Templated Workspace created');
+			this._indx=indx;
 			this._wname = name;
 			this._enabled = enabled;
 			this._active = active;
@@ -189,8 +190,16 @@ WorkspaceIndicator.prototype = {
 	    this.workspacesItems[this._currentWorkspace].setShowDot(false);
 	    this._currentWorkspace = global.screen.get_active_workspace().index();
 	    this.workspacesItems[this._currentWorkspace].setShowDot(true);
-
-	    this.statusLabel.set_text(this._labelText());
+		if(this.workspacesItems[this._currentWorkspace].control)
+		{
+			global.log('!!!!!do not control');
+			this.statusLabel.set_text(this.workspacesItems[this._currentWorkspace].actor.get_children()[0].text)
+		}
+		else
+		{
+			global.log('do not control');
+			this.statusLabel.set_text(this._labelText());
+		}
 	},
 
 	_labelText : function(workspaceIndex) {
@@ -203,11 +212,12 @@ WorkspaceIndicator.prototype = {
 	_createWorkspacesSection : function() {
 		this._workspaceSection.removeAll();
 		this.workspacesItems = [];
-
+		
 		let i = 0;
 		for(; i < global.screen.n_workspaces; i++) {
 			this.workspacesItems[i] = new PopupMenu.PopupMenuItem(this._labelText(i));
 			this._workspaceSection.addMenuItem(this.workspacesItems[i]);
+			this.workspacesItems[i].control = false;
 			this.workspacesItems[i].workspaceId = i;
 			this.workspacesItems[i].label_actor = this.statusLabel;
 			let self = this;
@@ -241,10 +251,16 @@ WorkspaceIndicator.prototype = {
 		let newIndex = global.screen.get_active_workspace().index() + diff;
 		this._activate(newIndex);
 	},
-	
+	_replaceWorkspace:function(workspace){
+		this.workspacesItems[workspace._indx].actor.get_children()[0].set_text(workspace._wname);
+		this.workspacesItems[workspace._indx].control = true;
+		this.statusLabel.set_text(workspace._wname);
+	},
 	_newWorkspace: function() {
 					let txt = this._newEntry.text.get_text();
-					let item = new TWorkspace(txt,false,false);
+					let indx = global.screen.get_active_workspace().index() ;
+					let item = new TWorkspace(txt,indx,false,true);
+					
 					let applications = [];
 					let windowslist = global.screen.get_active_workspace().list_windows();
 					let i=0;
@@ -260,7 +276,7 @@ WorkspaceIndicator.prototype = {
 						//global.log(applications[j]);
 						item._addApplication(applications[j]);
 						global.log("after addding one app apps are ");
-						oops = item._getApplications();
+						let oops = item._getApplications();
 						for(let p = 0; p < oops.length;p++)
 						{
 							global.log(oops[p]);
@@ -268,9 +284,8 @@ WorkspaceIndicator.prototype = {
 						global.log("end of apps");
 						//this._customWorkspaces.addMenuItem(item);
 					}
-					
-					
 
+					this._replaceWorkspace(item);
 					this._customWorkspaces.addMenuItem(item);
 	}
 	
