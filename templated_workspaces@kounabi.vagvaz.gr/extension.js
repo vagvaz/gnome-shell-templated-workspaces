@@ -27,42 +27,84 @@ function NewWorkspace() {
 	this._init.apply(this, arguments);
 }
 
-function TWorkspace(name,indx,enabled,active){
-	this._init(name,indx,enabled,active);
+function TWorkspace(name,indx,control,active,enabled){
+	this._init(name,indx,control,active,enabled);
 	//this._setup(name,enabled,active);
 }
 
 TWorkspace.prototype ={
 		__proto__: PopupMenu.PopupSubMenuMenuItem.prototype,
 		
-		_init: function(name,indx,enabled,active){
+		_init: function(name,indx,control,active,enabled){
 			PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this,name);
 			global.log('Templated Workspace created');
 			this._indx=indx;
 			this._wname = name;
+			this._control = control;
+			this.apps = [];
+			this.assoc_apps = new Array();
+			if(!this._control)
+			{
+				this._enabled = false;
+				this._active = false;
+				return;
+			}
+			
+			this._createSubMenuEntry(enabled,active);
+		},
+		_createSubMenuEntry:function (enabled,active){
 			this._enabled = enabled;
 			this._active = active;
-			this.apps =  new Array();
-			//let containerbox = new St.BoxLayout({style_class: 'hamster-box'});
-			//let label = new St.Label({style_class:'helloworld-label'});
-			global.log('a');
-			//label.set_text(this._wname);
-			//containerbox.add(label);
-			global.log('b');
+			
+			//the toglle switches for
+			//active: the tworkspace is open 
+			//enabled: the tworkspace should be loaded on init
 			 this._activeToggle = new PopupMenu.PopupSwitchMenuItem(_("active"),this._active);
 			 this._enableToggle = new PopupMenu.PopupSwitchMenuItem(_("enabled"),this._enabled);
-			 global.log('c');
-			 //containerbox.add(this._enableToggle);
-			 //containerbox.add(this._activeToggle);
+			
 			 this.menu.addMenuItem(this._activeToggle);
 			 this.menu.addMenuItem(this._enableToggle);
-			 global.log('d');
+			
+			 let entry = new PopupMenu.PopupMenuItem(_('Remove'));
+			 this.menu.addMenuItem(entry);
+			 entry.connect("activate",Lang.bind(this,this._remove));
 			 this._enableToggle.connect("toggled",Lang.bind(this,this._toggleEnable));
 			 this._activeToggle.connect("toggled",Lang.bind(this,this._toggleActive));
-			 global.log('1');
-			 //this.addActor(containerbox);
-			 global.log('f');
 		},
+		
+		
+		set_control:function(docontrol)
+		{
+			if(this._control)
+			{
+				if(docontrol)
+				{
+					global.log('already controlling the workspace');
+				}
+				else
+				{
+					global.log('Revoking Control for Workspace and removing submenuEntry')
+					this._control = docontrol;
+					this.emit('remove-sub-menu-entry',this);
+				}
+			}
+			else{
+				if(docontrol)
+				{
+					global.log('We do not  control the workspace');
+				}
+				else
+				{
+					//mark that we control the tworkspace and create the submenu entry for our basemenuItem
+					
+					this_control = docontrol;
+					this._createSubMenuEntry(false,true);
+					//emit the signal to add this as submenu entry
+					this.emit('add-sub-menu-entry',this)
+				}
+			}
+		},
+		
 		_toggleEnable:function(item)
 		{
 			if(item != null)
@@ -97,13 +139,18 @@ TWorkspace.prototype ={
 			}
 		},
 		
+		_remove:function()
+		{
+			//this.emit('deactivate');
+			this.emit('remove-sub-menu-entry',this);
+		},
 		
 		_addApplication:function(app){
 			global.log("adding application");
 			global.log(app);
-			if(this[app] == undefined)
+			if(this.assoc_apps[app] == undefined)
 			{
-				this[app] = true
+				this.assoc_apps[app] = new Boolean(true);
 				this.apps[this.apps.length] = app;
 			}
 			else
@@ -156,8 +203,10 @@ WorkspaceIndicator.prototype = {
 
 	_init: function(){
 		PanelMenu.SystemStatusButton.prototype._init.call(this, 'folder');
+		//initialize our array of workspaces;
 		
-	  this._currentWorkspace = global.screen.get_active_workspace().index();
+		
+	   this._currentWorkspace = global.screen.get_active_workspace().index();
 		this.statusLabel = new St.Label({ text: this._labelText() });
 		
 		let item = new NewWorkspace();
@@ -190,16 +239,17 @@ WorkspaceIndicator.prototype = {
 	    this.workspacesItems[this._currentWorkspace].setShowDot(false);
 	    this._currentWorkspace = global.screen.get_active_workspace().index();
 	    this.workspacesItems[this._currentWorkspace].setShowDot(true);
-		if(this.workspacesItems[this._currentWorkspace].control)
-		{
-			global.log('!!!!!do not control');
-			this.statusLabel.set_text(this.workspacesItems[this._currentWorkspace].actor.get_children()[0].text)
-		}
-		else
-		{
-			global.log('do not control');
-			this.statusLabel.set_text(this._labelText());
-		}
+		//if(this.workspacesItems[this._currentWorkspace].control)
+		//{
+		//	global.log('!!!!!do not control');
+		//	this.statusLabel.set_text(this.workspacesItems[this._currentWorkspace].actor.get_children()[0].text)
+		//}
+		//else
+		//{
+		//	global.log('do not control');
+		//	this.statusLabel.set_text(this._labelText());
+		//}
+		this.statusLabel.set_text(this.workspacesItems[this._currentWorkspace].twork._wname);
 	},
 
 	_labelText : function(workspaceIndex) {
@@ -217,7 +267,7 @@ WorkspaceIndicator.prototype = {
 		for(; i < global.screen.n_workspaces; i++) {
 			this.workspacesItems[i] = new PopupMenu.PopupMenuItem(this._labelText(i));
 			this._workspaceSection.addMenuItem(this.workspacesItems[i]);
-			this.workspacesItems[i].control = false;
+			this.workspacesItems[i].twork = new TWorkspace(this._labelText(i),false,false,false) ;
 			this.workspacesItems[i].workspaceId = i;
 			this.workspacesItems[i].label_actor = this.statusLabel;
 			let self = this;
@@ -259,8 +309,9 @@ WorkspaceIndicator.prototype = {
 	_newWorkspace: function() {
 					let txt = this._newEntry.text.get_text();
 					let indx = global.screen.get_active_workspace().index() ;
-					let item = new TWorkspace(txt,indx,false,true);
-					
+					this.workspacesItems[indx].twork.destroy();
+					this.workspacesItems[indx].twork = new TWorkspace(txt,indx,true,true,false);
+					let item = this.workspacesItems[indx].twork;
 					let applications = [];
 					let windowslist = global.screen.get_active_workspace().list_windows();
 					let i=0;
@@ -274,9 +325,9 @@ WorkspaceIndicator.prototype = {
 					
 						applications[j] = windowslist[i].get_wm_class().toLowerCase()+".desktop";
 						//global.log(applications[j]);
-						item._addApplication(applications[j]);
+						this.workspacesItems[indx].twork._addApplication(applications[j]);
 						global.log("after addding one app apps are ");
-						let oops = item._getApplications();
+						let oops = this.workspacesItems[indx].twork._getApplications();
 						for(let p = 0; p < oops.length;p++)
 						{
 							global.log(oops[p]);
@@ -285,9 +336,89 @@ WorkspaceIndicator.prototype = {
 						//this._customWorkspaces.addMenuItem(item);
 					}
 
-					this._replaceWorkspace(item);
-					this._customWorkspaces.addMenuItem(item);
+					this._replaceWorkspace(this.workspacesItems[indx].twork);
+					this._customWorkspaces.addMenuItem(this.workspacesItems[indx].twork);
+	},
+	 _parseConfig: function() {
+        // Set the default values
+        for (let i = 0; i < _configOptions.length; i++)
+            this[_configOptions[i][0]] = _configOptions[i][3];
+
+	// Search for configuration files first in system config dirs and after in the user dir
+	let _configDirs = [GLib.get_system_config_dirs(), GLib.get_user_config_dir()];
+	for(var i = 0; i < _configDirs.length; i++) {
+            let _configFile = _configDirs[i] + "/gnome-shell-pomodoro/gnome_shell_pomodoro.json";
+
+            if (GLib.file_test(_configFile, GLib.FileTest.EXISTS)) {
+		let filedata = null;
+
+		try {
+                    filedata = GLib.file_get_contents(_configFile, null, 0);
+                    global.log("Pomodoro: Using config file = " + _configFile);
+
+                    let jsondata = JSON.parse(filedata[1]);
+                    let parserVersion = null;
+                    if (jsondata.hasOwnProperty("version"))
+			parserVersion = jsondata.version;
+                    else
+			throw "Parser version not defined";
+
+                    for (let i = 0; i < _configOptions.length; i++) {
+			let option = _configOptions[i];
+			if (jsondata.hasOwnProperty(option[1]) && jsondata[option[1]].hasOwnProperty(option[2])) {
+                            // The option "category" and the actual option is defined in config file,
+                            // override it!
+                            this[option[0]] = jsondata[option[1]][option[2]];
+			}
+                    }
+		}
+		catch (e) {
+                    global.logError("Pomodoro: Error reading config file " + _configFile + ", error = " + e);
+		}
+		finally {
+                    filedata = null;
+		}
+            }
 	}
+    },
+
+
+    _saveConfig: function() {
+        let _configDir = GLib.get_user_config_dir() + "/gnome-shell-templated-workspaces";
+        let _configFile = _configDir + "/gnome_shell_tworkspaces.json";
+        let filedata = null;
+        let jsondata = {};
+
+        if (GLib.file_test(_configDir, GLib.FileTest.EXISTS | GLib.FileTest.IS_DIR) == false &&
+                GLib.mkdir_with_parents(_configDir, 0x1ED) != 0) { // 0755 base 8 = 0x1ED base 16
+                    global.logError("Templated Workspaces: Failed to create configuration directory. Path = " +
+                            _configDir + ". Configuration will not be saved.");
+                }
+
+        try {
+            jsondata["version"] = this._configVersion;
+            for (let i = 0; i < _configOptions.length; i++) {
+                let option = _configOptions[i];
+                // Insert the option "category", if it's undefined
+                if (jsondata.hasOwnProperty(option[1]) == false) {
+                    jsondata[option[1]] = {};
+                }
+
+                // Update the option key/value pairs
+                jsondata[option[1]][option[2]] = this[option[0]];
+            }
+            filedata = JSON.stringify(jsondata, null, "  ");
+            GLib.file_set_contents(_configFile, filedata, filedata.length);
+        }
+        catch (e) {
+            global.logError("Templated Workspaces: Error writing config file = " + e);
+        }
+        finally {
+            jsondata = null;
+            filedata = null;
+        }
+        global.log("Templated Workspaces: Updated config file = " + _configFile);
+    }
 	
 }
 
