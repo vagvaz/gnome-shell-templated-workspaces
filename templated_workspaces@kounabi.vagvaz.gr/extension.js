@@ -189,6 +189,8 @@ NewWorkspace.prototype = {
 							box.add(this.text);
 								
 							this.addActor(box);
+							
+							
 				},
 
 
@@ -205,7 +207,8 @@ WorkspaceIndicator.prototype = {
 		PanelMenu.SystemStatusButton.prototype._init.call(this, 'folder');
 		//initialize our array of workspaces;
 		
-		
+		this.tworkspaces = [];
+		this.tworkspaces_assoc = {};
 	   this._currentWorkspace = global.screen.get_active_workspace().index();
 		this.statusLabel = new St.Label({ text: this._labelText() });
 		
@@ -232,9 +235,22 @@ WorkspaceIndicator.prototype = {
 		global.screen.connect_after('workspace-switched', Lang.bind(this,this._updateIndicator));
 		this.actor.connect('scroll-event', Lang.bind(this, this._onScrollEvent));
 		this._createWorkspacesSection();
+		this._parseConfig();
+		//~ this._createCustomWorkspacesSection();
 	
 	},
 
+	//~ _createCustomWorkspacesSection: function()
+	//~ {
+		//~ 
+		//~ for(let indx = 0; indx < this.tworkspaces; indx++)
+		//~ {
+			//~ if(this.tworkspaces[indx]._control)
+			//~ {
+				//~ 
+			//~ }
+		//~ }
+	//~ },
 	_updateIndicator: function() {
 	    this.workspacesItems[this._currentWorkspace].setShowDot(false);
 	    this._currentWorkspace = global.screen.get_active_workspace().index();
@@ -268,6 +284,7 @@ WorkspaceIndicator.prototype = {
 			this.workspacesItems[i] = new PopupMenu.PopupMenuItem(this._labelText(i));
 			this._workspaceSection.addMenuItem(this.workspacesItems[i]);
 			this.workspacesItems[i].twork = new TWorkspace(this._labelText(i),false,false,false) ;
+			this._addTWorkspace(this.workspacesItems[i].twork);
 			this.workspacesItems[i].workspaceId = i;
 			this.workspacesItems[i].label_actor = this.statusLabel;
 			let self = this;
@@ -301,16 +318,55 @@ WorkspaceIndicator.prototype = {
 		let newIndex = global.screen.get_active_workspace().index() + diff;
 		this._activate(newIndex);
 	},
+	
 	_replaceWorkspace:function(workspace){
 		this.workspacesItems[workspace._indx].actor.get_children()[0].set_text(workspace._wname);
 		this.workspacesItems[workspace._indx].control = true;
 		this.statusLabel.set_text(workspace._wname);
 	},
+	
+	_addTWorkspace: function(newTWorkspace)
+	{
+		if(this.tworkspaces_assoc[newTWorkspace._wname] == undefined)
+		{
+			this.tworkspaces[this.tworkspaces.length] = newTWorkspace;
+			this.tworkspaces_assoc[newTWorkspace._wname] = this.tworkspaces.length-1;
+			if(newTWorkspace._control)
+				this._customWorkspaces.addMenuItem(newTWorkspace);
+		}
+	},
+	
+	_removeTWorkspace: function(oldWorkspace)
+	{
+		if(this.tworkspaces_assoc[oldWorkspace._wname] != undefined)
+		{
+		//get index of workspace
+			let indx = this.tworkspaces_assoc[oldWorkspace._wname];
+		//remove from association array 
+			this.tworkspaces_assoc[oldWorkspace._wname] = undefined;
+		//remove it from actual array
+			this.tworkspaces.splice(indx,1);
+		//remove from menu
+		
+			if(oldWorkspace._control)
+			{
+				this._customWorkspaces.removeAll();
+				for(let i = 0; i < this.tworkspaces.length;i++)
+				{
+					if(this.tworkspaces[i]._control)
+						this._customWorkspaces.addMenuItem(this.tworkspaces[i]);
+				}
+			}
+		}
+	},
+	
 	_newWorkspace: function() {
 					let txt = this._newEntry.text.get_text();
 					let indx = global.screen.get_active_workspace().index() ;
+					this._removeTWorkspace(this.workspacesItems[indx].twork);
 					this.workspacesItems[indx].twork.destroy();
 					this.workspacesItems[indx].twork = new TWorkspace(txt,indx,true,true,false);
+					this._addTWorkspace(this.workspacesItems[indx].twork);
 					let item = this.workspacesItems[indx].twork;
 					let applications = [];
 					let windowslist = global.screen.get_active_workspace().list_windows();
@@ -337,49 +393,52 @@ WorkspaceIndicator.prototype = {
 					}
 
 					this._replaceWorkspace(this.workspacesItems[indx].twork);
-					this._customWorkspaces.addMenuItem(this.workspacesItems[indx].twork);
+					//addTWorkspace(this.workspacesItems[indx].twork);
+					this._saveConfig();
 	},
 	 _parseConfig: function() {
         // Set the default values
-        for (let i = 0; i < _configOptions.length; i++)
-            this[_configOptions[i][0]] = _configOptions[i][3];
-
 	// Search for configuration files first in system config dirs and after in the user dir
 	let _configDirs = [GLib.get_system_config_dirs(), GLib.get_user_config_dir()];
-	for(var i = 0; i < _configDirs.length; i++) {
-            let _configFile = _configDirs[i] + "/gnome-shell-pomodoro/gnome_shell_pomodoro.json";
+		for(var i = 0; i < _configDirs.length; i++)
+		{
+            let _configFile = _configDirs[i] + "/gnome-shell-templated-workspaces/gnome_shell_tworkspaces.json";
 
             if (GLib.file_test(_configFile, GLib.FileTest.EXISTS)) {
-		let filedata = null;
+				let filedata = null;
 
-		try {
-                    filedata = GLib.file_get_contents(_configFile, null, 0);
-                    global.log("Pomodoro: Using config file = " + _configFile);
+				try {
+							 filedata = GLib.file_get_contents(_configFile, null, 0);
+							 global.log("Template Workspaces: Using config file = " + _configFile);
 
-                    let jsondata = JSON.parse(filedata[1]);
-                    let parserVersion = null;
-                    if (jsondata.hasOwnProperty("version"))
-			parserVersion = jsondata.version;
-                    else
-			throw "Parser version not defined";
-
-                    for (let i = 0; i < _configOptions.length; i++) {
-			let option = _configOptions[i];
-			if (jsondata.hasOwnProperty(option[1]) && jsondata[option[1]].hasOwnProperty(option[2])) {
-                            // The option "category" and the actual option is defined in config file,
-                            // override it!
-                            this[option[0]] = jsondata[option[1]][option[2]];
+							 let jsondata = JSON.parse(filedata[1]);
+							 let workspacenum =  jsondata['numberofworkspaces'];
+							 for(let i = 0; i < workspacenum;i++)
+							 {
+									
+									 
+									 let wname = jsondata[i]['wname'];
+									 let enabled = jsondata[i]['enabled'];
+									 let active = false; //this should not activate the previous active 
+									 let apps = jsondata[i]['apps'];
+									 let control = true; //we control this tworkspace since we load it from configFile
+									 let savedWorkspace = new TWorkspace(wname,-1,true,active,enabled);
+									 for(let index = 0; index < apps.length; index++)
+									 {
+										 savedWorkspace._addApplication(apps[index]);
+									 }
+									 this._addTWorkspace(savedWorkspace);
+							}
+							global.log('Saved Workspaces were loaded');
+					}
+				catch (e) {
+								  global.logError("Template Workspaces: Error reading config file " + _configFile + ", error = " + e);
+				}
+				finally {
+								  filedata = null;
+				}
 			}
-                    }
-		}
-		catch (e) {
-                    global.logError("Pomodoro: Error reading config file " + _configFile + ", error = " + e);
-		}
-		finally {
-                    filedata = null;
-		}
-            }
-	}
+       }
     },
 
 
@@ -396,19 +455,39 @@ WorkspaceIndicator.prototype = {
                 }
 
         try {
-            jsondata["version"] = this._configVersion;
-            for (let i = 0; i < _configOptions.length; i++) {
-                let option = _configOptions[i];
-                // Insert the option "category", if it's undefined
-                if (jsondata.hasOwnProperty(option[1]) == false) {
-                    jsondata[option[1]] = {};
-                }
-
-                // Update the option key/value pairs
-                jsondata[option[1]][option[2]] = this[option[0]];
-            }
+            //~ jsondata["version"] = this._configVersion;
+            //~ for (let i = 0; i < _configOptions.length; i++) {
+                //~ let option = _configOptions[i];
+                //~ // Insert the option "category", if it's undefined
+                //~ if (jsondata.hasOwnProperty(option[1]) == false) {
+                    //~ jsondata[option[1]] = {};
+                //~ }
+//~ 
+                //~ // Update the option key/value pairs
+                //~ jsondata[option[1]][option[2]] = this[option[0]];
+                let counter = 0;
+                for(let i = 0; i < this.tworkspaces.length;i++)
+                {
+						 
+						 if(this.tworkspaces[i]._control)
+						 {
+							 jsondata[counter] ={};
+							 jsondata[counter]['wname']   = this.tworkspaces[i]._wname;
+							 jsondata[counter]['enabled'] = this.tworkspaces[i]._enabled;
+							 jsondata[counter]['active']  = this.tworkspaces[i]._active;
+							 jsondata[counter]['apps'] = [];
+							 let apps = this.tworkspaces[i]._getApplications();
+							 for(let index = 0; index < apps.length; index++)
+							 {
+								 jsondata[counter]['apps'][index] = apps[index];
+							 }
+							 counter = counter +1;
+						 }
+					 }
+            jsondata["numberofworkspaces"]=counter;
             filedata = JSON.stringify(jsondata, null, "  ");
             GLib.file_set_contents(_configFile, filedata, filedata.length);
+            
         }
         catch (e) {
             global.logError("Templated Workspaces: Error writing config file = " + e);
