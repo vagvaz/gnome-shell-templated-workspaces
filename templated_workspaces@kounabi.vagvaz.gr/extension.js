@@ -13,6 +13,8 @@ const PopupMenu = imports.ui.popupMenu;
 const Panel = imports.ui.panel;
 const Tweener = imports.ui.tweener;
 const Main = imports.ui.main;
+const Shell = imports.gi.Shell;
+
 
 function WorkspaceIndicator() {
 	this._init.apply(this, arguments);
@@ -51,10 +53,13 @@ TWorkspace.prototype ={
 				return;
 			}
 			//create the submenu entry
-			this._createSubMenuEntry(enabled,active);
+			this._createSubMenuEntry(enabled,active,true);
 		},
-		_createSubMenuEntry:function (enabled,active){
+		_createSubMenuEntry:function (enabled,active,frominit){
 		
+			if(!frominit)
+				PopupMenu.PopupSubMenuMenuItem.prototype._init.call(this,this._wname);
+			
 			this._enabled = enabled;
 			this._active = active;
 			
@@ -325,16 +330,51 @@ WorkspaceIndicator.prototype = {
 	
 	//Replace a workspace
 	_replaceWorkspace:function(workspace){
+		//update label text for menu
 		this.workspacesItems[workspace._indx].actor.get_children()[0].set_text(workspace._wname);
 		this._updateIndicator();
 	},
 	
+	_enableTWorkspace:function(twork){
+		let index = this.tworkspaces_assoc[twork._wname];
+		if(index == undefined)
+		{
+			global.logError("enabling TWorkspace failed because index was undefined");
+			return;
+		}
+		this.tworkspaces[index]._enabled =true;
+		this._saveConfig();
+	},
+	
+	_disableTWorkspace:function(twork){
+		let index = this.tworkspaces_assoc[twork._wname];
+		if(index == undefined)
+		{
+			global.logError("Disabling TWorkspace failed because index was undefined");
+			return;
+		}
+		this.tworkspaces[index]._enabled =false;
+		this._saveConfig();
+	},
 	//add a new Template Workspace
 	_addTWorkspace: function(newTWorkspace)
 	{
 		if(this.tworkspaces_assoc[newTWorkspace._wname] == undefined)
 		{ // if the association array does not have somthine then it is a new TWorkspace so we must add it
 			//add it to the workspaces array
+			newTWorkspace.connect('enable',Lang.bind(this,function(workspace){
+			 this._enableTWorkspace(workspace) }));
+			newTWorkspace.connect('disable',Lang.bind(this,function(workspace){
+			 this._disableTWorkspace(workspace) }));
+			
+			newTWorkspace.connect('activate',Lang.bind(this,function(workspace){
+			 this._activateTWorkspace(workspace) })); 
+			  
+			newTWorkspace.connect('deactivate',Lang.bind(this,function(workspace){
+			 this._deactivateTWorkspace(workspace) }));
+			 
+			newTWorkspace.connect('remove-sub-menu-entry',Lang.bind(this,function(workspace){
+			 this._removeTWorkspace(workspace) })); 
 			this.tworkspaces[this.tworkspaces.length] = newTWorkspace;
 			//association name -> index in the array
 			this.tworkspaces_assoc[newTWorkspace._wname] = this.tworkspaces.length-1;
@@ -351,25 +391,112 @@ WorkspaceIndicator.prototype = {
 		//get index of workspace
 			let indx = this.tworkspaces_assoc[oldWorkspace._wname];
 		//remove from association array 
+			let reload = this.tworkspaces[indx]._control;
 			this.tworkspaces_assoc[oldWorkspace._wname] = undefined;
 		//remove it from actual array
-			this.tworkspaces.splice(indx,1);
-		//remove from menu
-		
-			//If we control the tworkspace we must update the customWorkspaces menu section
-			if(oldWorkspace._control)
+			for(let i = this.tworkspaces.length-1; i > indx; i--)
 			{
-				this._customWorkspaces.removeAll();
-				for(let i = 0; i < this.tworkspaces.length;i++)
+				this.tworkspaces_assoc[this.tworkspaces[i]._wname]=i-1;
+			}
+			let old = this.tworkspaces.splice(indx,1);
+			//old = undefined;
+			this._saveConfig();
+		//remove from menu
+			//If we control the tworkspace we must update the customWorkspaces menu section
+			if(reload)
+			{
+				let menuitems = this._customWorkspaces._getMenuItems();
+
+				for(let i = 0; i < menuitems.length;i++)
 				{
 					//add all the Template Workspaces we control
-					if(this.tworkspaces[i]._control)
-						this._customWorkspaces.addMenuItem(this.tworkspaces[i]);
+					if(menuitems[i].label.text.toString() == oldWorkspace._wname.toString())
+					{
+						this._customWorkspaces.box.remove_actor(menuitems[i].actor);
+						old = undefined;
+						break;
+					}
+					
 				}
+				
 			}
 		}
 	},
+	_activateTWorkspace: function(twork)
+	{
+		let index = this.tworkspaces_assoc[twork._wname];
+		if(index == undefined)
+		{
+			global.logError("Activating TWorkspace failed because index was undefined");
+			return;
+		}
+		
+		
+		
+		if(this.tworkspaces[index]._active)
+		{
+			global.log('TWorkspace ' + this.tworkspaces[index]._wname.toString() + ' is already active');
+		//	return;
+		}
+		
+		let workapps = this.tworkspaces[index]._getApplications();
+		this.tworkspaces[index]._indx = global.screen.get_n_workspaces();
+		global.screen.append_new_workspace(true, global.get_current_time());
+		let newindx = global.screen.get_active_workspace_index();
+		this._currentWorkspace = newindx;
+		
+		for(let i = 0; i < workapps.length;i++)
+		{
+			app = Gio.DesktopAppInfo.new(workapps[i]);
+			app.launch([],null);
+		}
+	},
 	
+	_deactivateTWorkspace: function(twork)
+	{
+		let index = this.tworkspaces_assoc[twork._wname];
+		if(index == undefined)
+		{
+			global.logError("Deactivating TWorkspace failed because index was undefined");
+			return;
+		}
+
+		if(!this.tworkspaces[index]._active)
+		{
+			global.log('TWorkspace' + twork._wname.toString() + ' is already inactive');
+			return;
+		}
+		
+		workapps = this.tworkspaces[index]._getApplications();
+		this.tworkspaces[index]._indx = global.screen.get_n_workspaces();
+		let oldWorkspace = global.screen.get_workspace_by_index(this.tworkspaces[index]._indx);
+		let active_windows = oldWorkspace.list_windows();		
+		let winTracker =  Shell.WindowTracker.get_default();
+		let target_workspace_index = 0;
+		if(this.tworkspace[index]._indx == 0)
+			target_workspace_index = 1;
+		for(let i = 0; i < active_windows.length;i++)
+		{
+			let app = winTracker.get_window_app(active_windows[i]);
+			if(this.tworkspaces[index][app.get_id()] != undefined)
+			{
+				let windowsapp = app.get_windows();
+				for(let j = windowsapp.length;j>=0;j--)
+				{
+					windowsapp.delete();
+				}
+			}
+			else
+			{
+				let windowsapp = app.get_windows();
+				for(let j = windowsapp.length;j>=0;j--)
+				{
+					windowsapp.change_workspace_by_index(target_workspace_index);
+				}
+			}
+		}
+
+	},
 	//the action when we want to save a new workspace
 	_newWorkspace: function() {
 					let txt = this._newEntry.text.get_text();
